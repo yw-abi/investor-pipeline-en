@@ -1,1 +1,512 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investor Pipeline Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #1a1a2e; }
 
+  header {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  header span { font-size: 12px; opacity: 0.6; }
+
+  .summary {
+    display: flex;
+    gap: 10px;
+    padding: 12px 20px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 16px;
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat-card .num { font-size: 22px; font-weight: 800; }
+  .stat-card .label { font-size: 10px; color: #888; margin-top: 2px; }
+  .stat-card.total .num { color: #1a1a2e; }
+  .stat-card.done .num { color: #22c55e; }
+  .stat-card.progress .num { color: #f59e0b; }
+  .stat-card.pending .num { color: #94a3b8; }
+
+  .filters {
+    padding: 0 20px 10px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 4px 12px;
+    border-radius: 14px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+  }
+  .filter-btn.active, .filter-btn:hover {
+    background: #1a1a2e;
+    color: white;
+    border-color: #1a1a2e;
+  }
+
+  .table-wrap { padding: 0 20px 20px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.07); }
+  thead tr { background: #1a1a2e; color: white; }
+  th { padding: 7px 8px; font-size: 10px; font-weight: 600; text-align: left; letter-spacing: 0.3px; white-space: nowrap; }
+  td { padding: 6px 8px; font-size: 11px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbff; }
+
+  .investor-name { font-weight: 700; font-size: 11.5px; }
+  .llc-name { color: #6366f1; font-size: 10px; margin-top: 1px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.done    { background: #dcfce7; color: #15803d; }
+  .badge.pending { background: #fef9c3; color: #a16207; }
+  .badge.waiting { background: #f1f5f9; color: #64748b; }
+  .badge.forming { background: #ede9fe; color: #7c3aed; }
+
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .prop-cell { font-size: 10px; color: #555; line-height: 1.4; }
+  .prop-cell.empty { color: #ccc; }
+
+  .address-line { font-size: 9px; color: #aaa; margin-top: 1px; }
+
+  .registered-address {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 20px;
+    background: #f8f9fb;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 11px;
+    color: #64748b;
+    direction: ltr;
+    text-align: center;
+  }
+  .ra-label { font-weight: 600; color: #475569; white-space: nowrap; }
+  .ra-value { font-family: 'Segoe UI', monospace; color: #1a1a2e; letter-spacing: 0.2px; }
+
+  .updated { font-size: 10px; color: #aaa; text-align: center; padding: 8px; }
+
+  tbody tr.inv-row { cursor: pointer; transition: background 0.15s; }
+  tbody tr.inv-row:hover td { background: #f0f4ff; }
+  tbody tr.inv-row.expanded td { background: #f7f8ff; border-bottom: none; }
+
+  tr.detail-row { display: none; }
+  tr.detail-row.open { display: table-row; }
+  tr.detail-row td {
+    padding: 0;
+    background: #f7f8ff;
+    border-bottom: 2px solid #e0e4ef;
+  }
+  .detail-panel {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px 12px;
+    direction: ltr;
+    flex-wrap: wrap;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .detail-field {
+    flex: 1;
+    min-width: 160px;
+    max-width: 320px;
+    background: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+    position: relative;
+  }
+  .detail-field:hover { box-shadow: 0 2px 8px rgba(99,102,241,0.15); }
+  .detail-field .df-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #6366f1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+  }
+  .detail-field .df-value {
+    font-size: 12px;
+    color: #1a1a2e;
+    line-height: 1.5;
+    white-space: pre-line;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .detail-field .df-value.missing { color: #aaa; font-style: italic; }
+  .detail-field .copy-hint {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #bbb;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .detail-field:hover .copy-hint { opacity: 1; }
+  .detail-field.copied .copy-hint { color: #22c55e; opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏠 Investor Pipeline</h1>
+  <span id="date-display"></span>
+</header>
+
+<div class="summary">
+  <div class="stat-card total"><div class="num" id="s-total">0</div><div class="label">Total Clients</div></div>
+  <div class="stat-card done"><div class="num" id="s-ein">0</div><div class="label">EIN Received</div></div>
+  <div class="stat-card progress"><div class="num" id="s-ss4">0</div><div class="label">Awaiting EIN</div></div>
+  <div class="stat-card pending"><div class="num" id="s-forming">0</div><div class="label">In Formation</div></div>
+</div>
+
+<div class="registered-address">
+  <span class="ra-label">📍 Registered Agent Address:</span>
+  <span class="ra-value" id="ra-address"></span>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" onclick="filter('all', this)">All</button>
+  <button class="filter-btn" onclick="filter('ein', this)">✅ EIN Received</button>
+  <button class="filter-btn" onclick="filter('ss4', this)">⏳ Awaiting EIN</button>
+  <button class="filter-btn" onclick="filter('forming', this)">🔄 In Formation</button>
+  <button class="filter-btn" onclick="filter('bank', this)">🏦 Has Bank Account</button>
+</div>
+
+<div class="table-wrap">
+<table id="main-table">
+  <thead>
+    <tr>
+      <th>Investor</th>
+      <th>LLC</th>
+      <th>Formation</th>
+      <th>SS4</th>
+      <th>EIN</th>
+      <th>Bank Account</th>
+      <th>Wire Transfer</th>
+      <th>Property 1</th>
+      <th>Property 2</th>
+      <th>Property 3</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+</div>
+<div class="updated">Last updated: <span id="updated-date"></span></div>
+
+<script>
+const investors = [
+  {
+    name: "Hertzel Friedman",
+    llc: "Friedman Ventures LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "35-2941594",
+    addressIL: "32 Kaplan Elisheva st.\nHaifa\nIsrael 2626229"
+  },
+  {
+    name: "Ariel & Dalit Nishlis",
+    llc: "Nishlis Holdings LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "41-3742609",
+    addressIL: "60 HaEmeq\nGivat Ela\nIsrael 3657000"
+  },
+  {
+    name: "Ofir Miller",
+    llc: "Miller Holdings LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "61-2327448",
+    addressIL: "69 HaGalil\nGivat Ela\nIsrael 3657000"
+  },
+  {
+    name: "Chen Fogelman & Matan Rachmani",
+    llc: "G&N Adventure LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "30-1480268",
+    addressIL: "16 HaKalaniot st\nKiryat Tivon\nIsrael"
+  },
+  {
+    name: "Talia & Alon Eden",
+    llc: "TAE Holdings LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "61-2330760",
+    addressIL: "Kadesh Barne'a St 3, Apt 18\nTel Aviv\nIsrael 6998603"
+  },
+  {
+    name: "Vitaly & Svetlana Yurin",
+    llc: "SV Capital Holdings LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "done",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "38-4385850",
+    addressIL: "St Shezarit 8/2\nMigdal Haemeq\nIsrael 2305223"
+  },
+  {
+    name: "Eran & Clara Ami",
+    llc: "AmiCore LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "",
+    einNumber: "30-1481715",
+    addressIL: "Palmakh St 21\nNess Ziona\nIsrael"
+  },
+  {
+    name: "Idan & Heidi Lev Ari",
+    llc: "LVA Holdings LLC",
+    stage: "ein",
+    formation: "done",
+    ss4: "done",
+    ein: "done",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "Official EIN letter received ✅",
+    einNumber: "32-0845575",
+    addressIL: "1 Renuar St.\nKiryat Ata 2826801\nIsrael"
+  },
+  {
+    name: "Elad, Hadar & Maayan Tubi",
+    llc: "AVRUMI LLC",
+    stage: "ss4",
+    formation: "done",
+    ss4: "done",
+    ein: "pending",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "Two people named Hadar Tubi",
+    einNumber: "",
+    addressIL: "Lev HaSharon 43, appt. 4\nTzoran 4285819\nIsrael"
+  },
+  {
+    name: "Menashe Brodetzky",
+    llc: "MBK Ventures LLC",
+    stage: "ss4",
+    formation: "done",
+    ss4: "done",
+    ein: "pending",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "Single Member LLC",
+    einNumber: "",
+    addressIL: "23 Rimon St.\nShorashim 20164\nIsrael"
+  },
+  {
+    name: "David & Stephanie Ben Shimon",
+    llc: "DBSH Property LLC",
+    stage: "ss4",
+    formation: "done",
+    ss4: "done",
+    ein: "pending",
+    bank: "waiting",
+    funding: "waiting",
+    props: [null, null, null],
+    notes: "Multi Member LLC",
+    einNumber: "",
+    addressIL: "34 Hacarmel St.\nGivat Ela 3657000\nIsrael"
+  }
+];
+
+const REGISTERED_ADDRESS = '5901 Balcones Drive, STE 100, Austin TX 78731, USA';
+
+const labels = {
+  done:    { text: "✅",  cls: "done" },
+  pending: { text: "⏳", cls: "pending" },
+  waiting: { text: "—",  cls: "waiting" },
+  forming: { text: "🔄", cls: "forming" }
+};
+
+function badge(key) {
+  if (!key) return `<span class="badge waiting">—</span>`;
+  const l = labels[key];
+  return `<span class="badge ${l.cls}">${l.text}</span>`;
+}
+
+function propCell(p) {
+  if (!p) return `<span class="prop-cell empty">—</span>`;
+  return `<div class="prop-cell">
+    📍 ${p.address || '—'}<br>
+    ${p.tenant ? '👤 Tenant: ' + p.tenant : '🔓 No tenant'}
+  </div>`;
+}
+
+let currentFilter = 'all';
+
+function render(f) {
+  const tbody = document.getElementById('tbody');
+  const filtered = f === 'all' ? investors :
+    f === 'ein'     ? investors.filter(i => i.ein === 'done') :
+    f === 'ss4'     ? investors.filter(i => i.ein === 'pending') :
+    f === 'forming' ? investors.filter(i => i.stage === 'forming') :
+    f === 'bank'    ? investors.filter(i => i.bank === 'done') : investors;
+
+  tbody.innerHTML = filtered.map((inv, idx) => {
+    const einDisplay = inv.einNumber || (inv.ein === 'done' ? 'EIN Received' : 'Pending');
+    const einClass = inv.einNumber ? '' : 'missing';
+    return `
+    <tr class="inv-row" data-stage="${inv.stage}" onclick="toggleDetail(this)">
+      <td><div class="investor-name">${inv.name}</div></td>
+      <td><div class="llc-name">${inv.llc}</div></td>
+      <td>${badge(inv.formation)}</td>
+      <td>${badge(inv.ss4)}</td>
+      <td>${badge(inv.ein)}</td>
+      <td>${badge(inv.bank)}</td>
+      <td>${badge(inv.funding)}</td>
+      <td>${propCell(inv.props[0])}</td>
+      <td>${propCell(inv.props[1])}</td>
+      <td>${propCell(inv.props[2])}</td>
+      <td style="font-size:10px;color:#888;max-width:120px;">${inv.notes}</td>
+    </tr>
+    <tr class="detail-row">
+      <td colspan="11">
+        <div class="detail-panel">
+          <div class="detail-field" onclick="copyField(this, event)">
+            <div class="df-label">Israel Address</div>
+            <div class="df-value">${inv.addressIL || '<span class="missing">—</span>'}</div>
+            <span class="copy-hint">📋 copy</span>
+          </div>
+          <div class="detail-field" onclick="copyField(this, event)">
+            <div class="df-label">EIN Number</div>
+            <div class="df-value ${einClass}">${einDisplay}</div>
+            <span class="copy-hint">📋 copy</span>
+          </div>
+          <div class="detail-field" onclick="copyField(this, event)">
+            <div class="df-label">US Address (Registered Agent)</div>
+            <div class="df-value">${REGISTERED_ADDRESS}</div>
+            <span class="copy-hint">📋 copy</span>
+          </div>
+          <div class="detail-field" onclick="copyField(this, event)">
+            <div class="df-label">LLC Name</div>
+            <div class="df-value">${inv.llc}</div>
+            <span class="copy-hint">📋 copy</span>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('s-total').textContent = investors.length;
+  document.getElementById('s-ein').textContent = investors.filter(i => i.ein === 'done').length;
+  document.getElementById('s-ss4').textContent = investors.filter(i => i.ein === 'pending').length;
+  document.getElementById('s-forming').textContent = investors.filter(i => i.stage === 'forming').length;
+}
+
+function filter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render(f);
+}
+
+function toggleDetail(row) {
+  const detail = row.nextElementSibling;
+  const wasOpen = detail.classList.contains('open');
+  document.querySelectorAll('tr.detail-row.open').forEach(r => {
+    r.classList.remove('open');
+    r.previousElementSibling.classList.remove('expanded');
+  });
+  if (!wasOpen) {
+    detail.classList.add('open');
+    row.classList.add('expanded');
+  }
+}
+
+function copyField(el, event) {
+  event.stopPropagation();
+  const val = el.querySelector('.df-value').textContent.trim();
+  if (!val || val === '—' || val === 'Pending') return;
+  navigator.clipboard.writeText(val).then(() => {
+    el.classList.add('copied');
+    el.querySelector('.copy-hint').textContent = '✅ copied!';
+    setTimeout(() => {
+      el.classList.remove('copied');
+      el.querySelector('.copy-hint').textContent = '📋 copy';
+    }, 1500);
+  });
+}
+
+const now = new Date();
+const opts = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+document.getElementById('date-display').textContent = now.toLocaleDateString('en-US', opts);
+document.getElementById('updated-date').textContent = now.toLocaleDateString('en-US', opts);
+
+document.getElementById('ra-address').textContent = REGISTERED_ADDRESS;
+render('all');
+</script>
+</body>
+</html>
